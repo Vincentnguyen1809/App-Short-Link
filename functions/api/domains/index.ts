@@ -23,6 +23,24 @@ export const onRequestPost: PagesFunction = async (context) => {
   const prisma = getPrisma(env);
   const { hostname, mainPageRedirect, error404Redirect } = await request.json() as any;
 
+  const authHeader = request.headers.get('Authorization');
+  let userRole = 'MEMBER';
+  let userId = 'default-user';
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const payload = JSON.parse(atob(token));
+      userRole = payload.role;
+      userId = payload.id || 'default-user';
+    } catch (e) {
+      console.error('Failed to parse token', e);
+    }
+  }
+
+  if (userRole !== 'ADMIN') {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403 });
+  }
+
   try {
     const domain = await prisma.domain.create({
       data: {
@@ -37,7 +55,7 @@ export const onRequestPost: PagesFunction = async (context) => {
 
     await prisma.auditLog.create({
       data: {
-        userId: 'default-user',
+        userId: userId,
         action: 'CREATE',
         entityType: 'DOMAIN',
         entityId: domain.id,

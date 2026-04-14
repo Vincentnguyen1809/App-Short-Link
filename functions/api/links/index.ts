@@ -9,6 +9,21 @@ export const onRequestGet: PagesFunction = async (context) => {
   const order = url.searchParams.get('order') || 'desc';
   const search = url.searchParams.get('search') || '';
 
+  // Parse Authorization header
+  const authHeader = request.headers.get('Authorization');
+  let userRole = 'ADMIN';
+  let userId = 'default-user';
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const payload = JSON.parse(atob(token));
+      userRole = payload.role;
+      userId = payload.id || 'default-user';
+    } catch (e) {
+      console.error('Failed to parse token', e);
+    }
+  }
+
   const dbConnected = !!(env as any).DATABASE_URL && ((env as any).DATABASE_URL.startsWith('postgresql://') || (env as any).DATABASE_URL.startsWith('postgres://'));
   if (!dbConnected) return new Response(JSON.stringify([]), { headers: { 'Content-Type': 'application/json' } });
 
@@ -17,14 +32,20 @@ export const onRequestGet: PagesFunction = async (context) => {
     const sortField = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
     const sortOrder = order === 'asc' ? 'asc' : 'desc';
 
+    const whereClause: any = {
+      OR: [
+        { title: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+        { originalUrl: { contains: search, mode: 'insensitive' } },
+      ]
+    };
+
+    if (userRole === 'MEMBER') {
+      whereClause.creatorId = userId;
+    }
+
     const links = await prisma.link.findMany({
-      where: {
-        OR: [
-          { title: { contains: search, mode: 'insensitive' } },
-          { slug: { contains: search, mode: 'insensitive' } },
-          { originalUrl: { contains: search, mode: 'insensitive' } },
-        ]
-      },
+      where: whereClause,
       include: { 
         domain: true, 
         tags: true,
@@ -60,6 +81,19 @@ export const onRequestPost: PagesFunction = async (context) => {
   const prisma = getPrisma(env);
   const { originalUrl, slug, domainId, title, utmSource, utmMedium, utmCampaign, isCloaked, password } = await request.json() as any;
 
+  // Parse Authorization header
+  const authHeader = request.headers.get('Authorization');
+  let userId = 'default-user';
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const payload = JSON.parse(atob(token));
+      userId = payload.id || 'default-user';
+    } catch (e) {
+      console.error('Failed to parse token', e);
+    }
+  }
+
   try {
     const link = await prisma.link.create({
       data: {
@@ -73,13 +107,13 @@ export const onRequestPost: PagesFunction = async (context) => {
         isCloaked,
         password,
         workspaceId: 'default-workspace',
-        creatorId: 'default-user',
+        creatorId: userId,
       }
     });
 
     await prisma.auditLog.create({
       data: {
-        userId: 'default-user',
+        userId: userId,
         action: 'CREATE',
         entityType: 'LINK',
         entityId: link.id,

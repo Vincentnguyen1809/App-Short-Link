@@ -70,17 +70,25 @@ export default function DomainSettings({ domain, onClose, onSave }: DomainSettin
   const handleSave = async () => {
     setSaving(true);
     try {
+      const token = localStorage.getItem('ts_token');
       const res = await fetch(`/api/domains/${domain.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
         body: JSON.stringify(formData)
       });
       if (res.ok) {
         const updated = await res.json() as any;
         onSave(updated);
+      } else {
+        const err = await res.json() as any;
+        alert(err.error || 'Failed to save settings');
       }
     } catch (error) {
       console.error('Failed to save domain settings:', error);
+      alert('An error occurred. Please try again.');
     } finally {
       setSaving(false);
     }

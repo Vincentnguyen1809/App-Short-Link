@@ -16,18 +16,26 @@ enum Role {
   MEMBER
 }
 
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
 model User {
-  id            String      @id @default(cuid())
-  email         String      @unique
-  name          String?
-  passwordHash  String
-  role          Role        @default(MEMBER)
-  workspaces    Workspace[] @relation("WorkspaceMembers")
-  ownedWorkspaces Workspace[] @relation("WorkspaceOwner")
-  links         Link[]
-  auditLogs     AuditLog[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id                String      @id @default(cuid())
+  email             String      @unique
+  name              String?
+  passwordHash      String
+  role              Role        @default(MEMBER)
+  status            UserStatus  @default(PENDING)
+  verificationToken String?
+  workspaces        Workspace[] @relation("WorkspaceMembers")
+  ownedWorkspaces   Workspace[] @relation("WorkspaceOwner")
+  links             Link[]
+  auditLogs         AuditLog[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 }
 
 model Workspace {

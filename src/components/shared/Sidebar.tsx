@@ -27,9 +27,18 @@ interface SidebarProps {
   activeTab: string;
   setActiveTab: (id: string) => void;
   onLogout: () => void;
+  userRole?: 'ADMIN' | 'MEMBER' | null;
 }
 
-export default function Sidebar({ activeTab, setActiveTab, onLogout }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, onLogout, userRole }: SidebarProps) {
+  const filteredMenuItems = menuItems.filter(item => {
+    if (userRole === 'MEMBER') {
+      // Hide Audit Logs and Security for members
+      if (item.id === 'audit' || item.id === 'security') return false;
+    }
+    return true;
+  });
+
   return (
     <aside className="w-64 bg-[#141414] border-r border-[#262626] flex flex-col h-screen sticky top-0">
       <div className="p-6 border-bottom border-[#262626]">
@@ -42,7 +51,7 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout }: SidebarPr
       </div>
 
       <nav className="flex-1 px-4 py-6 space-y-1">
-        {menuItems.map((item) => (
+        {filteredMenuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}

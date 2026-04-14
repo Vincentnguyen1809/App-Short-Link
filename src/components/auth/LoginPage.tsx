@@ -24,6 +24,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       .then(res => res.json())
       .then((data: any) => setAppearance(data))
       .catch(err => console.error('Failed to fetch appearance settings:', err));
+
+    // Check URL for success or error messages (e.g., from email verification)
+    const params = new URLSearchParams(window.location.search);
+    const successMsg = params.get('success');
+    const errorMsg = params.get('error');
+    if (successMsg) setSuccess(successMsg);
+    if (errorMsg) setError(errorMsg);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

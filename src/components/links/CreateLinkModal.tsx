@@ -51,9 +51,13 @@ export default function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLi
     e.preventDefault();
     setLoading(true);
     try {
+      const token = localStorage.getItem('ts_token');
       const res = await fetch('/api/links', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
         body: JSON.stringify(formData)
       });
       if (res.ok) {

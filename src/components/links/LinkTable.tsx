@@ -28,7 +28,12 @@ export default function LinkTable() {
   const fetchLinks = () => {
     setLoading(true);
     const params = new URLSearchParams({ sortBy, order, search });
-    fetch(`/api/links?${params.toString()}`)
+    const token = localStorage.getItem('ts_token');
+    fetch(`/api/links?${params.toString()}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    })
       .then(res => res.json())
       .then(json => {
         setLinks(Array.isArray(json) ? json : []);
@@ -50,8 +55,18 @@ export default function LinkTable() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this link?')) return;
     try {
-      const res = await fetch(`/api/links/${id}`, { method: 'DELETE' });
+      const token = localStorage.getItem('ts_token');
+      const res = await fetch(`/api/links/${id}`, { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
       if (res.ok) fetchLinks();
+      else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete link');
+      }
     } catch (error) {
       console.error('Failed to delete link:', error);
     }

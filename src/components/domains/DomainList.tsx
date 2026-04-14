@@ -31,11 +31,13 @@ interface Domain {
   createdAt: string;
 }
 
-export default function DomainList({ onAddClick }: { onAddClick?: () => void }) {
+export default function DomainList({ onAddClick, userRole }: { onAddClick?: () => void, userRole?: 'ADMIN' | 'MEMBER' | null }) {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDomain, setSelectedDomain] = useState<Domain | null>(null);
   const [dnsModalDomain, setDnsModalDomain] = useState<string | null>(null);
+
+  const isMember = userRole === 'MEMBER';
 
   const fetchDomains = () => {
     setLoading(true);
@@ -58,8 +60,18 @@ export default function DomainList({ onAddClick }: { onAddClick?: () => void }) 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this domain?')) return;
     try {
-      const res = await fetch(`/api/domains/${id}`, { method: 'DELETE' });
+      const token = localStorage.getItem('ts_token');
+      const res = await fetch(`/api/domains/${id}`, { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
       if (res.ok) fetchDomains();
+      else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete domain');
+      }
     } catch (error) {
       console.error('Failed to delete domain:', error);
     }
@@ -93,12 +105,14 @@ export default function DomainList({ onAddClick }: { onAddClick?: () => void }) 
                   <p className="text-xs text-gray-500">Added on {new Date(domain.createdAt).toLocaleDateString()}</p>
                 </div>
               </div>
-              <button 
-                onClick={() => handleDelete(domain.id)}
-                className="p-2 text-gray-500 hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-all"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
+              {!isMember && (
+                <button 
+                  onClick={() => handleDelete(domain.id)}
+                  className="p-2 text-gray-500 hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-all"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              )}
             </div>
             
             <div className="p-6 space-y-6">
@@ -166,18 +180,20 @@ export default function DomainList({ onAddClick }: { onAddClick?: () => void }) 
           </div>
         ))}
 
-        <button 
-          onClick={onAddClick}
-          className="border-2 border-dashed border-[#262626] rounded-xl p-8 flex flex-col items-center justify-center gap-4 hover:border-orange-500/50 hover:bg-orange-500/5 transition-all group text-left"
-        >
-          <div className="w-12 h-12 bg-[#1a1a1a] rounded-full flex items-center justify-center border border-[#262626] group-hover:bg-orange-500 group-hover:border-orange-500 transition-all">
-            <Plus className="w-6 h-6 text-gray-400 group-hover:text-white" />
-          </div>
-          <div className="text-center">
-            <h3 className="text-white font-bold">Add Custom Domain</h3>
-            <p className="text-sm text-gray-500 mt-1">Connect your own branded domain</p>
-          </div>
-        </button>
+        {!isMember && (
+          <button 
+            onClick={onAddClick}
+            className="border-2 border-dashed border-[#262626] rounded-xl p-8 flex flex-col items-center justify-center gap-4 hover:border-orange-500/50 hover:bg-orange-500/5 transition-all group text-left"
+          >
+            <div className="w-12 h-12 bg-[#1a1a1a] rounded-full flex items-center justify-center border border-[#262626] group-hover:bg-orange-500 group-hover:border-orange-500 transition-all">
+              <Plus className="w-6 h-6 text-gray-400 group-hover:text-white" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-white font-bold">Add Custom Domain</h3>
+              <p className="text-sm text-gray-500 mt-1">Connect your own branded domain</p>
+            </div>
+          </button>
+        )}
       </div>
 
       {selectedDomain && (

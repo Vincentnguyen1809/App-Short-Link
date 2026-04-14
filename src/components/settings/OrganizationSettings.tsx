@@ -2,20 +2,49 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Users, Lock, Eye, EyeOff, Trash2, Plus, Save, RefreshCw, Briefcase } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 
-export default function OrganizationSettings() {
+interface OrganizationSettingsProps {
+  userRole?: 'ADMIN' | 'MEMBER' | null;
+}
+
+export default function OrganizationSettings({ userRole }: OrganizationSettingsProps) {
   const [workspace, setWorkspace] = useState({ name: '', slug: '' });
   const [appearance, setAppearance] = useState({
     backgroundUrl: '',
     logoUrl: ''
   });
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const isMember = userRole === 'MEMBER';
+
+  const fetchUsers = async () => {
+    const token = localStorage.getItem('ts_token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/users', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch users', err);
+    }
+  };
+
   useEffect(() => {
-    Promise.all([
+    const promises = [
       fetch('/api/workspace').then(res => res.json()),
       fetch('/api/settings/appearance').then(res => res.json())
-    ])
+    ];
+
+    if (!isMember) {
+      fetchUsers();
+    }
+
+    Promise.all(promises)
       .then(([workspaceData, appearanceData]: [any, any]) => {
         setWorkspace(workspaceData);
         setAppearance(appearanceData);
@@ -25,20 +54,46 @@ export default function OrganizationSettings() {
         console.error('Failed to fetch settings:', err);
         setLoading(false);
       });
-  }, []);
+  }, [isMember]);
+
+  const handleUpdateUserStatus = async (userId: string, status: string) => {
+    const token = localStorage.getItem('ts_token');
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        fetchUsers();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to update user status');
+      }
+    } catch (err) {
+      console.error('Error updating user status', err);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
     try {
+      const token = localStorage.getItem('ts_token');
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       await Promise.all([
         fetch('/api/workspace', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(workspace)
         }),
         fetch('/api/settings/appearance', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(appearance)
         })
       ]);
@@ -84,8 +139,9 @@ export default function OrganizationSettings() {
                 type="text" 
                 value={workspace.name}
                 onChange={(e) => setWorkspace({ ...workspace, name: e.target.value })}
+                disabled={isMember}
                 placeholder="ThinkSmart" 
-                className="w-full bg-[#0a0a0a] border border-[#262626] rounded-lg px-4 py-2.5 text-sm text-white focus:border-orange-500" 
+                className="w-full bg-[#0a0a0a] border border-[#262626] rounded-lg px-4 py-2.5 text-sm text-white focus:border-orange-500 disabled:opacity-50 disabled:cursor-not-allowed" 
               />
             </div>
             <div>
@@ -96,8 +152,9 @@ export default function OrganizationSettings() {
                   type="text" 
                   value={workspace.slug}
                   onChange={(e) => setWorkspace({ ...workspace, slug: e.target.value })}
+                  disabled={isMember}
                   placeholder="default" 
-                  className="flex-1 bg-[#0a0a0a] border border-[#262626] rounded-r-lg px-4 py-2.5 text-sm text-white focus:border-orange-500" 
+                  className="flex-1 bg-[#0a0a0a] border border-[#262626] rounded-r-lg px-4 py-2.5 text-sm text-white focus:border-orange-500 disabled:opacity-50 disabled:cursor-not-allowed" 
                 />
               </div>
             </div>
@@ -121,8 +178,9 @@ export default function OrganizationSettings() {
                 type="text" 
                 value={appearance.backgroundUrl}
                 onChange={(e) => setAppearance({ ...appearance, backgroundUrl: e.target.value })}
+                disabled={isMember}
                 placeholder="https://images.unsplash.com/..." 
-                className="w-full bg-[#0a0a0a] border border-[#262626] rounded-lg px-4 py-2.5 text-sm text-white focus:border-orange-500" 
+                className="w-full bg-[#0a0a0a] border border-[#262626] rounded-lg px-4 py-2.5 text-sm text-white focus:border-orange-500 disabled:opacity-50 disabled:cursor-not-allowed" 
               />
               <p className="text-[10px] text-gray-500 mt-2">The image displayed on the login, registration, and password recovery pages.</p>
             </div>
@@ -132,8 +190,9 @@ export default function OrganizationSettings() {
                 type="text" 
                 value={appearance.logoUrl || ''}
                 onChange={(e) => setAppearance({ ...appearance, logoUrl: e.target.value })}
+                disabled={isMember}
                 placeholder="https://your-domain.com/logo.png" 
-                className="w-full bg-[#0a0a0a] border border-[#262626] rounded-lg px-4 py-2.5 text-sm text-white focus:border-orange-500" 
+                className="w-full bg-[#0a0a0a] border border-[#262626] rounded-lg px-4 py-2.5 text-sm text-white focus:border-orange-500 disabled:opacity-50 disabled:cursor-not-allowed" 
               />
               <p className="text-[10px] text-gray-500 mt-2">Replaces the default ThinkSmart icon on the login page.</p>
             </div>
@@ -142,64 +201,88 @@ export default function OrganizationSettings() {
       </section>
 
       {/* Team & Permissions Section */}
-      <section className="bg-[#1a1a1a] border border-[#262626] rounded-xl overflow-hidden">
-        <div className="p-6 border-b border-[#262626] flex items-center justify-between bg-[#141414]">
-          <div className="flex items-center gap-3">
-            <Users className="w-5 h-5 text-orange-500" />
-            <h3 className="text-white font-bold">Team & Permissions</h3>
+      {!isMember && (
+        <section className="bg-[#1a1a1a] border border-[#262626] rounded-xl overflow-hidden">
+          <div className="p-6 border-b border-[#262626] flex items-center justify-between bg-[#141414]">
+            <div className="flex items-center gap-3">
+              <Users className="w-5 h-5 text-orange-500" />
+              <h3 className="text-white font-bold">Team & Permissions</h3>
+            </div>
+            <button className="px-3 py-1.5 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
+              <Plus className="w-3.5 h-3.5" /> Invite Member
+            </button>
           </div>
-          <button className="px-3 py-1.5 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
-            <Plus className="w-3.5 h-3.5" /> Invite Member
-          </button>
-        </div>
-        <div className="p-0">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-[#141414] text-gray-500 text-[10px] uppercase tracking-wider border-b border-[#262626]">
-                <th className="px-6 py-3 font-medium">User</th>
-                <th className="px-6 py-3 font-medium">Role</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-                <th className="px-6 py-3 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#262626]">
-              {[
-                { name: 'Xuan Thuong', email: 'xuanthuong@example.com', role: 'Admin', status: 'Active' },
-                { name: 'Minh Anh', email: 'minhanh@example.com', role: 'Manager', status: 'Active' },
-                { name: 'Hoang Nam', email: 'hoangnam@example.com', role: 'Member', status: 'Pending' },
-              ].map((user) => (
-                <tr key={user.email} className="hover:bg-white/5 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-white">{user.name}</span>
-                      <span className="text-xs text-gray-500">{user.email}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={cn(
-                      "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
-                      user.role === 'Admin' ? "bg-orange-500/10 text-orange-500" : "bg-blue-500/10 text-blue-500"
-                    )}>
-                      {user.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1.5">
-                      <div className={cn("w-1.5 h-1.5 rounded-full", user.status === 'Active' ? "bg-green-500" : "bg-yellow-500")} />
-                      <span className="text-xs text-gray-400">{user.status}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="p-1.5 text-gray-500 hover:text-red-500 transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
+          <div className="p-0">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-[#141414] text-gray-500 text-[10px] uppercase tracking-wider border-b border-[#262626]">
+                  <th className="px-6 py-3 font-medium">User</th>
+                  <th className="px-6 py-3 font-medium">Role</th>
+                  <th className="px-6 py-3 font-medium">Status</th>
+                  <th className="px-6 py-3 font-medium text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody className="divide-y divide-[#262626]">
+                {users.map((user) => (
+                  <tr key={user.email} className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-white">{user.name || 'No Name'}</span>
+                        <span className="text-xs text-gray-500">{user.email}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={cn(
+                        "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
+                        user.role === 'ADMIN' ? "bg-orange-500/10 text-orange-500" : "bg-blue-500/10 text-blue-500"
+                      )}>
+                        {user.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5">
+                        <div className={cn("w-1.5 h-1.5 rounded-full", 
+                          user.status === 'ACTIVE' ? "bg-green-500" : 
+                          user.status === 'PENDING' ? "bg-yellow-500" : "bg-red-500"
+                        )} />
+                        <span className="text-xs text-gray-400">{user.status}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {user.status === 'PENDING' && (
+                          <button 
+                            onClick={() => handleUpdateUserStatus(user.id, 'ACTIVE')}
+                            className="px-2 py-1 bg-green-500/10 text-green-500 text-xs font-medium rounded hover:bg-green-500/20 transition-colors"
+                          >
+                            Approve
+                          </button>
+                        )}
+                        {user.status === 'ACTIVE' && user.role !== 'ADMIN' && (
+                          <button 
+                            onClick={() => handleUpdateUserStatus(user.id, 'SUSPENDED')}
+                            className="px-2 py-1 bg-red-500/10 text-red-500 text-xs font-medium rounded hover:bg-red-500/20 transition-colors"
+                          >
+                            Suspend
+                          </button>
+                        )}
+                        {user.status === 'SUSPENDED' && (
+                          <button 
+                            onClick={() => handleUpdateUserStatus(user.id, 'ACTIVE')}
+                            className="px-2 py-1 bg-green-500/10 text-green-500 text-xs font-medium rounded hover:bg-green-500/20 transition-colors"
+                          >
+                            Unsuspend
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* IP Exclusion Section */}
       <section className="bg-[#1a1a1a] border border-[#262626] rounded-xl overflow-hidden">

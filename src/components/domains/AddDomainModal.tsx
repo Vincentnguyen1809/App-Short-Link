@@ -21,9 +21,13 @@ export default function AddDomainModal({ isOpen, onClose, onSuccess }: AddDomain
     e.preventDefault();
     setLoading(true);
     try {
+      const token = localStorage.getItem('ts_token');
       const res = await fetch('/api/domains', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
         body: JSON.stringify(formData)
       });
       if (res.ok) {

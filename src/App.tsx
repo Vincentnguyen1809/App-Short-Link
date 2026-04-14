@@ -18,6 +18,7 @@ import { cn } from '@/src/lib/utils';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('ts_token'));
+  const [userRole, setUserRole] = useState<'ADMIN' | 'MEMBER' | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [isDomainModalOpen, setIsDomainModalOpen] = useState(false);
@@ -26,6 +27,26 @@ export default function App() {
   const [loadingDetailed, setLoadingDetailed] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+
+  React.useEffect(() => {
+    const token = localStorage.getItem('ts_token');
+    if (token) {
+      try {
+        // Decode the base64 payload we created in login.ts
+        const payload = JSON.parse(atob(token));
+        setUserRole(payload.role);
+      } catch (e) {
+        console.error('Failed to parse token', e);
+        // Fallback or clear invalid token
+        if (token === 'mock-jwt-token-123') {
+           setUserRole('ADMIN');
+        } else {
+           localStorage.removeItem('ts_token');
+           setIsAuthenticated(false);
+        }
+      }
+    }
+  }, [isAuthenticated]);
 
   const handleLogin = (token: string) => {
     localStorage.setItem('ts_token', token);
@@ -221,14 +242,16 @@ export default function App() {
                 <h1 className="text-3xl font-bold tracking-tight text-white">Custom Domains</h1>
                 <p className="text-gray-400 mt-1">Configure and monitor your branded domains.</p>
               </div>
-              <button 
-                onClick={() => setIsDomainModalOpen(true)}
-                className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" /> Add Domain
-              </button>
+              {userRole !== 'MEMBER' && (
+                <button 
+                  onClick={() => setIsDomainModalOpen(true)}
+                  className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> Add Domain
+                </button>
+              )}
             </header>
-            <DomainList key={`domains-${refreshKey}`} onAddClick={() => setIsDomainModalOpen(true)} />
+            <DomainList key={`domains-${refreshKey}`} onAddClick={() => setIsDomainModalOpen(true)} userRole={userRole} />
           </>
         );
       case 'analytics':
@@ -289,7 +312,7 @@ export default function App() {
                 <p className="text-gray-400 mt-1">Manage team permissions and workspace profile.</p>
               </div>
             </header>
-            <OrganizationSettings />
+            <OrganizationSettings userRole={userRole} />
           </>
         );
       default:
@@ -311,7 +334,7 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-[#0a0a0a] text-gray-100 font-sans">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} userRole={userRole} />
       
       <main className="flex-1 p-8 overflow-y-auto">
         {renderContent()}
