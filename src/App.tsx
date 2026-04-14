@@ -48,7 +48,7 @@ export default function App() {
 
     fetch(`/api/analytics/summary?${params.toString()}`)
       .then(res => res.json())
-      .then(data => {
+      .then((data: any) => {
         if (data) {
           setSummary(data);
         }

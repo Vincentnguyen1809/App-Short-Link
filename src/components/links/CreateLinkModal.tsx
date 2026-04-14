@@ -37,9 +37,9 @@ export default function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLi
     if (isOpen) {
       fetch('/api/domains')
         .then(res => res.json())
-        .then(data => {
+        .then((data: any) => {
           setDomains(data);
-          if (data.length > 0) {
+          if (data && data.length > 0) {
             setFormData(prev => ({ ...prev, domainId: data[0].id }));
           }
         })
@@ -60,7 +60,7 @@ export default function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLi
         onSuccess?.();
         onClose();
       } else {
-        const err = await res.json();
+        const err = await res.json() as any;
         alert(err.error || 'Failed to create link');
       }
     } catch (error) {

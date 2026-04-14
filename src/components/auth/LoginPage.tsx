@@ -22,7 +22,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   React.useEffect(() => {
     fetch('/api/settings/appearance')
       .then(res => res.json())
-      .then(data => setAppearance(data))
+      .then((data: any) => setAppearance(data))
       .catch(err => console.error('Failed to fetch appearance settings:', err));
   }, []);
 
@@ -50,7 +50,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         body: JSON.stringify(body)
       });
 
-      const data = await res.json();
+      const data = await res.json() as any;
 
       if (res.ok) {
         if (mode === 'register' || mode === 'forgot') {

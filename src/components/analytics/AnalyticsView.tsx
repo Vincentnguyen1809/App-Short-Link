@@ -44,7 +44,7 @@ export default function AnalyticsView({ dateRange }: { dateRange?: { start: stri
 
     fetch(`/api/analytics/detailed?${params.toString()}`)
       .then(res => res.json())
-      .then(json => {
+      .then((json: any) => {
         setData(json);
         setLoading(false);
       })

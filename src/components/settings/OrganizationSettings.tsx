@@ -16,7 +16,7 @@ export default function OrganizationSettings() {
       fetch('/api/workspace').then(res => res.json()),
       fetch('/api/settings/appearance').then(res => res.json())
     ])
-      .then(([workspaceData, appearanceData]) => {
+      .then(([workspaceData, appearanceData]: [any, any]) => {
         setWorkspace(workspaceData);
         setAppearance(appearanceData);
         setLoading(false);

@@ -76,7 +76,7 @@ export default function DomainSettings({ domain, onClose, onSave }: DomainSettin
         body: JSON.stringify(formData)
       });
       if (res.ok) {
-        const updated = await res.json();
+        const updated = await res.json() as any;
         onSave(updated);
       }
     } catch (error) {

@@ -30,7 +30,7 @@ export default function AddDomainModal({ isOpen, onClose, onSuccess }: AddDomain
         setStep('success');
         onSuccess?.();
       } else {
-        const err = await res.json();
+        const err = await res.json() as any;
         alert(err.error || 'Failed to add domain');
       }
     } catch (error) {
