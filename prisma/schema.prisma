@@ -1,0 +1,209 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  MEMBER
+}
+
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  name          String?
+  passwordHash  String
+  role          Role        @default(MEMBER)
+  workspaces    Workspace[] @relation("WorkspaceMembers")
+  ownedWorkspaces Workspace[] @relation("WorkspaceOwner")
+  links         Link[]
+  auditLogs     AuditLog[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Workspace {
+  id            String      @id @default(cuid())
+  name          String
+  slug          String      @unique
+  ownerId       String
+  owner         User        @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members       User[]      @relation("WorkspaceMembers")
+  domains       Domain[]
+  links         Link[]
+  tags          Tag[]
+  auditLogs     AuditLog[]
+  ipExclusions  IPExclusion[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Domain {
+  id                String    @id @default(cuid())
+  hostname          String    @unique
+  workspaceId       String
+  workspace         Workspace @relation(fields: [workspaceId], references: [id])
+  dnsStatus         String    @default("pending") // pending, configured
+  sslStatus         String    @default("pending") // pending, active
+  mainPageRedirect  String?
+  error404Redirect  String?
+  links             Link[]
+  
+  // Tracking Settings
+  enableTracking    Boolean   @default(false)
+  gaId              String?
+  segmentKey        String?
+  fbPixelId         String?
+  adrollId          String?
+  webhookUrl        String?
+  
+  // QR Code Settings
+  qrForegroundColor String    @default("#000000")
+  qrBackgroundColor String    @default("#ffffff")
+  qrFinderColor     String    @default("#000000")
+  qrBorderRadius    Int       @default(0)
+  qrFinderPattern   String    @default("square") // square, rounded, dot
+  qrDotMode         String    @default("individual") // individual, connected
+  qrLogoUrl         String?
+  qrLogoSize        Int       @default(20)
+  qrNoLogoBorder    Boolean   @default(false)
+  qrLabel           String?
+  qrErrorCorrection String    @default("M") // L, M, Q, H
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Link {
+  id              String      @id @default(cuid())
+  slug            String
+  domainId        String
+  domain          Domain      @relation(fields: [domainId], references: [id])
+  originalUrl     String
+  title           String?
+  description     String?
+  workspaceId     String
+  workspace       Workspace   @relation(fields: [workspaceId], references: [id])
+  creatorId       String
+  creator         User        @relation(fields: [creatorId], references: [id])
+  
+  // Advanced Options
+  password        String?
+  expiresAt       DateTime?
+  clickLimit      Int?
+  isCloaked       Boolean     @default(false)
+  
+  // UTM Parameters
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  utmTerm         String?
+  utmContent      String?
+  
+  targetingRules  TargetingRule[]
+  abTests         ABTest[]
+  tags            Tag[]
+  clicks          Click[]
+  conversions     Conversion[]
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([domainId, slug])
+}
+
+model TargetingRule {
+  id        String   @id @default(cuid())
+  linkId    String
+  link      Link     @relation(fields: [linkId], references: [id])
+  type      String   // GEO, DEVICE
+  value     String   // e.g., "VN", "iOS"
+  targetUrl String
+}
+
+model ABTest {
+  id          String   @id @default(cuid())
+  linkId      String
+  link        Link     @relation(fields: [linkId], references: [id])
+  targetUrlB  String
+  weightA     Int      @default(50)
+  weightB     Int      @default(50)
+}
+
+model Tag {
+  id          String    @id @default(cuid())
+  name        String
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  links       Link[]
+
+  @@unique([workspaceId, name])
+}
+
+model Click {
+  id            String   @id @default(cuid())
+  linkId        String
+  link          Link     @relation(fields: [linkId], references: [id])
+  timestamp     DateTime @default(now())
+  ip            String?
+  country       String?
+  city          String?
+  device        String?
+  os            String?
+  browser       String?
+  referrer      String?
+  
+  // Captured UTMs at time of click
+  utmSource     String?
+  utmMedium     String?
+  utmCampaign   String?
+
+  conversion    Conversion?
+}
+
+model Conversion {
+  id          String   @id @default(cuid())
+  linkId      String
+  link        Link     @relation(fields: [linkId], references: [id])
+  clickId     String?  @unique
+  click       Click?   @relation(fields: [clickId], references: [id])
+  value       Float?   // Optional monetary value
+  type        String?  // e.g., "signup", "purchase"
+  timestamp   DateTime @default(now())
+  metadata    Json?
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  action      String    // CREATE, UPDATE, DELETE
+  entityType  String    // LINK, DOMAIN, WORKSPACE
+  entityId    String
+  details     Json?
+  timestamp   DateTime  @default(now())
+}
+
+model IPExclusion {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  ipPattern   String    // e.g., "1.2.3.4" or "192.168.1.*"
+}
+
+model AppSettings {
+  id            String   @id @default("global")
+  backgroundUrl String   @default("https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&q=80&w=2070")
+  logoUrl       String?
+  updatedAt     DateTime @updatedAt
+}
