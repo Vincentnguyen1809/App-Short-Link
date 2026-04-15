@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-// Bổ sung "Cổng nhận lệnh" để chuyển về trang Login
 interface RegisterProps {
   onSwitchToLogin: () => void;
 }
@@ -17,10 +16,7 @@ const Register = ({ onSwitchToLogin }: RegisterProps) => {
     try {
       const res = await axios.post('/api/auth/register', formData);
       setMsg(res.data.message || 'Đăng ký thành công!');
-      
-      // Đợi 3 giây rồi dùng lệnh của App.tsx để nhảy về trang Login
       setTimeout(() => onSwitchToLogin(), 3000);
-      
     } catch (err: any) {
       setMsg(err.response?.data?.error || 'Lỗi đăng ký, vui lòng thử lại');
     } finally {
@@ -32,7 +28,6 @@ const Register = ({ onSwitchToLogin }: RegisterProps) => {
     <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-white">
       <form onSubmit={handleSubmit} className="bg-[#1a1a1a] p-8 rounded-xl shadow-lg w-96 border border-[#262626]">
         <h2 className="text-2xl font-bold mb-6 text-orange-500 text-center">ThinkSmart Links</h2>
-        <p className="text-gray-400 text-sm mb-6 text-center">Đăng ký tài khoản hệ thống</p>
         
         {msg && (
           <div className={`mb-4 p-3 rounded text-sm text-center ${msg.includes('thành công') ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>
