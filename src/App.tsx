@@ -32,8 +32,14 @@ export default function App() {
     const token = localStorage.getItem('ts_token');
     if (token) {
       try {
-        // Decode the base64 payload we created in login.ts
-        const payload = JSON.parse(atob(token));
+        // Decode JWT payload from login.ts
+        const payloadPart = token.split('.')[1];
+        if (!payloadPart) {
+          throw new Error('Invalid token format');
+        }
+        const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+        const payload = JSON.parse(atob(padded));
         setUserRole(payload.role);
       } catch (e) {
         console.error('Failed to parse token', e);

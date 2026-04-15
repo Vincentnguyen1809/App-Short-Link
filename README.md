@@ -1,20 +1,54 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# App Short Link
 
-# Run and deploy your AI Studio app
+## Cloudflare Pages + Prisma Accelerate
 
-This contains everything you need to run your app locally.
+This project is configured for:
+- Frontend: React + Vite
+- Backend: Cloudflare Pages Functions (`functions/`)
+- Database access in runtime: Prisma Accelerate (`DATABASE_URL=prisma://...`)
 
-View your app in AI Studio: https://ai.studio/apps/e627c07c-12bf-4456-9c97-9236c552037c
+### Required environment variables
 
-## Run Locally
+- `DATABASE_URL`: Prisma Accelerate connection string (`prisma://...`) for runtime queries.
+- `DIRECT_URL`: Direct Supabase/Postgres connection string (`postgresql://...`) for Prisma CLI and bootstrap scripts.
+- `JWT_SECRET`: Secret used to sign/verify auth tokens.
+- `RESEND_API_KEY`: Resend API key for verification and reset emails.
+- `DOMAIN`: Public app URL used to generate email links.
 
-**Prerequisites:**  Node.js
+## Build
 
+```bash
+npm ci
+npx prisma generate
+npm run build
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Auth endpoints
+
+- `POST /api/auth/register`
+- `GET /api/auth/verify?token=...`
+- `POST /api/auth/login`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+
+## Bootstrap initial admin owner
+
+> Safety guard: this command **will not run** unless `BOOTSTRAP_OWNER_ENABLED=true` is set.
+
+1. Set these variables (example values shown):
+
+```bash
+export DIRECT_URL="postgresql://postgres:password@db.example.supabase.co:5432/postgres"
+export BOOTSTRAP_OWNER_ENABLED="true"
+export BOOTSTRAP_OWNER_EMAIL="owner@example.com"
+export BOOTSTRAP_OWNER_PASSWORD="ChangeMe123!"
+export BOOTSTRAP_OWNER_NAME="Initial Owner"
+```
+
+2. Run bootstrap:
+
+```bash
+npm run bootstrap:owner
+```
+
+This upserts an `ADMIN` user with `ACTIVE` status and ensures a default workspace exists.
