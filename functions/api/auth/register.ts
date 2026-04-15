@@ -1,99 +1,102 @@
-import { PrismaClient } from '@prisma/client';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { getPrisma } from '../../lib/prisma';
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function serializeError(error: unknown) {
+  const err = error as Error & { cause?: unknown };
+  return {
+    name: err?.name ?? 'UnknownError',
+    message: err?.message ?? String(error),
+    stack: err?.stack ?? null,
+    cause: err?.cause ?? null,
+    raw: String(error),
+  };
+}
+
+async function hashPassword(rawPassword: string) {
+  const encoder = new TextEncoder();
+  const buffer = await crypto.subtle.digest('SHA-256', encoder.encode(rawPassword));
+  return Array.from(new Uint8Array(buffer))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
 
 export const onRequestPost: PagesFunction = async (context) => {
-  const { request, env } = context;
-  const { email, password, name } = await request.json() as any;
-
-  if (!email || !password) {
-    return new Response(JSON.stringify({ error: 'Vui lòng điền đầy đủ thông tin' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
-  // FORCE THE PG ADAPTER
-  const pool = new Pool({ connectionString: (env as any).DATABASE_URL });
-  const adapter = new PrismaPg(pool);
-  const prisma = new PrismaClient({ adapter });
-
-  const dbConnected = !!(env as any).DATABASE_URL && ((env as any).DATABASE_URL.startsWith('postgresql://') || (env as any).DATABASE_URL.startsWith('postgres://'));
-
-  if (!dbConnected) {
-    return new Response(JSON.stringify({ error: 'Database not connected' }), { status: 503 });
-  }
-
   try {
+    const { request, env } = context;
+    const body = (await request.json()) as {
+      email?: string;
+      password?: string;
+      name?: string;
+    };
+
+    const email = body.email?.trim().toLowerCase();
+    const password = body.password;
+    const name = body.name?.trim();
+
+    if (!email || !password) {
+      return json({ error: 'Email and password are required.' }, 400);
+    }
+
+    if (!(env as { DATABASE_URL?: string }).DATABASE_URL?.startsWith('prisma://')) {
+      return json(
+        {
+          error: 'DATABASE_URL must be a Prisma Accelerate connection string (prisma://...).',
+        },
+        503,
+      );
+    }
+
+    const prisma = getPrisma(env as { DATABASE_URL: string });
+
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return new Response(JSON.stringify({ error: 'Email đã được sử dụng' }), { status: 400 });
+      return json({ error: 'Email is already in use.' }, 409);
     }
 
     const verificationToken = crypto.randomUUID();
-    
-    // In a real app, hash the password. For this demo, we store it directly as per original mock.
-    const user = await prisma.user.create({
+    const hashedPassword = await hashPassword(password);
+
+    await prisma.user.create({
       data: {
         email,
         name,
-        passwordHash: password,
+        password: hashedPassword,
         role: 'MEMBER',
         status: 'PENDING',
-        verificationToken
-      }
+        verificationToken,
+      },
     });
 
-    const resendApiKey = (env as any).RESEND_API_KEY;
-    const domain = (env as any).DOMAIN || new URL(request.url).origin;
+    const resendApiKey = (env as { RESEND_API_KEY?: string }).RESEND_API_KEY;
+    const domain = (env as { DOMAIN?: string }).DOMAIN || new URL(request.url).origin;
 
     if (resendApiKey) {
       const verifyLink = `${domain}/api/auth/verify?token=${verificationToken}`;
-      
-      const emailHtml = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-          <h2 style="color: #333; text-align: center;">Xác nhận tài khoản ThinkSmart Links</h2>
-          <p style="color: #555; font-size: 16px;">Xin chào ${name || email},</p>
-          <p style="color: #555; font-size: 16px;">Cảm ơn bạn đã đăng ký tài khoản. Vui lòng click vào nút bên dưới để xác nhận email của bạn:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${verifyLink}" style="background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Xác nhận Email</a>
-          </div>
-          <p style="color: #777; font-size: 14px; text-align: center;">Hoặc copy link này dán vào trình duyệt: <br> <a href="${verifyLink}" style="color: #f97316;">${verifyLink}</a></p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="color: #999; font-size: 12px; text-align: center;">Nếu bạn không yêu cầu đăng ký, vui lòng bỏ qua email này.</p>
-        </div>
-      `;
-
       await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'ThinkSmart Links <noreply@link.thinksmartins.com>',
+          from: 'App Short Link <noreply@example.com>',
           to: email,
-          subject: 'Xác nhận tài khoản ThinkSmart Links',
-          html: emailHtml
-        })
+          subject: 'Verify your account',
+          html: `<p>Hi ${name || email}, click <a href="${verifyLink}">here</a> to verify your account.</p>`,
+        }),
       });
     }
 
-    return new Response(JSON.stringify({ 
-      message: 'Đăng ký thành công! Vui lòng kiểm tra email để xác nhận tài khoản.' 
-    }), {
-      headers: { 'Content-Type': 'application/json' }
+    return json({
+      message: 'Registration successful. Please check your email to verify your account.',
     });
-
-  } catch (error: any) {
-    console.error("RAW ERROR LOG:", error);
-    return new Response(JSON.stringify({ 
-      error: error.message || 'Unknown Error',
-      name: error.name || 'No Name',
-      stack: error.stack || 'No Stack',
-      full: String(error)
-    }), {
-      status: 500, headers: { 'Content-Type': 'application/json' }
-    });
+  } catch (error) {
+    return json({ error: serializeError(error) }, 500);
   }
 };
