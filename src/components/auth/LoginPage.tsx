@@ -7,10 +7,11 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
   const [email, setEmail] = useState('admin@thinksmartins.com');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -29,6 +30,16 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     const params = new URLSearchParams(window.location.search);
     const successMsg = params.get('success');
     const errorMsg = params.get('error');
+    const token = params.get('token');
+
+    if (window.location.pathname === '/reset-password') {
+      setMode('reset');
+      setResetToken(token || '');
+      if (!token) {
+        setError('Reset token is missing. Please request a new password reset email.');
+      }
+    }
+
     if (successMsg) setSuccess(successMsg);
     if (errorMsg) setError(errorMsg);
   }, []);
@@ -48,6 +59,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     } else if (mode === 'forgot') {
       endpoint = '/api/auth/forgot-password';
       body = { email };
+    } else if (mode === 'reset') {
+      endpoint = '/api/auth/reset-password';
+      body = { token: resetToken, password };
     }
 
     try {
@@ -60,9 +74,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       const data = await res.json() as any;
 
       if (res.ok) {
-        if (mode === 'register' || mode === 'forgot') {
+        if (mode === 'register' || mode === 'forgot' || mode === 'reset') {
           setSuccess(data.message);
           setMode('login');
+          window.history.replaceState({}, '', '/login');
+          setPassword('');
         } else {
           onLogin(data.token);
         }
@@ -101,7 +117,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           <h1 className="text-2xl font-bold text-white mb-1">ThinkSmart Links</h1>
           <p className="text-gray-500 text-sm">
             {mode === 'register' ? 'Đăng ký tài khoản mới' : 
-             mode === 'forgot' ? 'Khôi phục mật khẩu' : 
+             mode === 'forgot' ? 'Khôi phục mật khẩu' :
+             mode === 'reset' ? 'Đặt lại mật khẩu mới' :
              'Hệ thống rút gọn link nội bộ'}
           </p>
         </div>
@@ -138,22 +155,24 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             </div>
           )}
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Email</label>
-            <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-orange-500 transition-colors" />
-              <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@thinksmartins.com"
-                required
-                className="w-full bg-[#0a0a0a] border border-[#262626] rounded-xl pl-12 pr-4 py-3.5 text-white text-sm focus:outline-none focus:border-orange-500 transition-all"
-              />
+          {mode !== 'reset' && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Email</label>
+              <div className="relative group">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-orange-500 transition-colors" />
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@thinksmartins.com"
+                  required={mode !== 'reset'}
+                  className="w-full bg-[#0a0a0a] border border-[#262626] rounded-xl pl-12 pr-4 py-3.5 text-white text-sm focus:outline-none focus:border-orange-500 transition-all"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
-          {mode !== 'forgot' && (
+          {(mode === 'login' || mode === 'register' || mode === 'reset') && (
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Mật khẩu</label>
               <div className="relative group">
@@ -177,11 +196,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           >
             {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : 
              (mode === 'register' ? 'Đăng ký ngay' : 
-              mode === 'forgot' ? 'Gửi yêu cầu' : 
+              mode === 'forgot' ? 'Gửi yêu cầu' :
+              mode === 'reset' ? 'Đặt lại mật khẩu' :
               'Đăng nhập')}
           </button>
 
-          {mode === 'login' && (
+          {(mode === 'login') && (
             <div className="text-center">
               <button 
                 type="button"
@@ -203,8 +223,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             }}
             className="text-sm text-gray-400 hover:text-orange-500 transition-colors"
           >
-            {mode === 'register' ? 'Đã có tài khoản? Đăng nhập' : 
-             mode === 'forgot' ? 'Quay lại đăng nhập' : 
+            {mode === 'register' ? 'Đã có tài khoản? Đăng nhập' :
+             mode === 'forgot' || mode === 'reset' ? 'Quay lại đăng nhập' :
              'Chưa có tài khoản? Đăng ký'}
           </button>
           <p className="text-[11px] text-gray-600 font-medium">ThinkSmart Insurance © 2025</p>

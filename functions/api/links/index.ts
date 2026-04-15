@@ -1,31 +1,40 @@
+import { requireAuth } from '../../lib/auth';
 import { getPrisma } from '../../lib/prisma';
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
 
 export const onRequestGet: PagesFunction = async (context) => {
   const { request, env } = context;
-  const prisma = getPrisma(env);
-  
+  const prisma = getPrisma(env as { DATABASE_URL: string });
+
   const url = new URL(request.url);
   const sortBy = url.searchParams.get('sortBy') || 'createdAt';
   const order = url.searchParams.get('order') || 'desc';
   const search = url.searchParams.get('search') || '';
 
-  // Parse Authorization header
-  const authHeader = request.headers.get('Authorization');
-  let userRole = 'ADMIN';
-  let userId = 'default-user';
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.split(' ')[1];
-      const payload = JSON.parse(atob(token));
-      userRole = payload.role;
-      userId = payload.id || 'default-user';
-    } catch (e) {
-      console.error('Failed to parse token', e);
-    }
+  const databaseUrl = (env as { DATABASE_URL?: string }).DATABASE_URL;
+  const jwtSecret = (env as { JWT_SECRET?: string }).JWT_SECRET;
+
+  if (!databaseUrl?.startsWith('prisma://')) {
+    return json({ error: 'DATABASE_URL must use Prisma Accelerate (prisma://...)' }, 503);
   }
 
-  const dbConnected = !!(env as any).DATABASE_URL && ((env as any).DATABASE_URL.startsWith('postgresql://') || (env as any).DATABASE_URL.startsWith('postgres://'));
-  if (!dbConnected) return new Response(JSON.stringify([]), { headers: { 'Content-Type': 'application/json' } });
+  if (!jwtSecret) {
+    return json({ error: 'JWT_SECRET is missing.' }, 503);
+  }
+
+  const auth = await requireAuth(request, jwtSecret);
+  if (!auth) {
+    return json({ error: 'Unauthorized' }, 403);
+  }
+
+  const userRole = auth.role;
+  const userId = auth.id;
 
   try {
     const validSortFields = ['createdAt', 'clicks', 'conversions', 'title', 'slug'];
@@ -37,7 +46,7 @@ export const onRequestGet: PagesFunction = async (context) => {
         { title: { contains: search, mode: 'insensitive' } },
         { slug: { contains: search, mode: 'insensitive' } },
         { originalUrl: { contains: search, mode: 'insensitive' } },
-      ]
+      ],
     };
 
     if (userRole === 'MEMBER') {
@@ -46,52 +55,54 @@ export const onRequestGet: PagesFunction = async (context) => {
 
     const links = await prisma.link.findMany({
       where: whereClause,
-      include: { 
-        domain: true, 
+      include: {
+        domain: true,
         tags: true,
         _count: {
-          select: { clicks: true, conversions: true }
-        }
+          select: { clicks: true, conversions: true },
+        },
       },
-      orderBy: sortField === 'clicks' || sortField === 'conversions' 
-        ? { [sortField]: { _count: sortOrder } }
-        : { [sortField]: sortOrder }
+      orderBy:
+        sortField === 'clicks' || sortField === 'conversions'
+          ? { [sortField]: { _count: sortOrder } }
+          : { [sortField]: sortOrder },
     });
 
     const formattedLinks = links.map((link: any) => ({
       ...link,
       clicks: link._count.clicks,
       conversions: link._count.conversions,
-      conversionRate: link._count.clicks > 0 
-        ? ((link._count.conversions / link._count.clicks) * 100).toFixed(2) 
-        : 0
+      conversionRate:
+        link._count.clicks > 0 ? ((link._count.conversions / link._count.clicks) * 100).toFixed(2) : 0,
     }));
 
-    return new Response(JSON.stringify(formattedLinks), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return json(formattedLinks);
   } catch (error) {
     console.error('Failed to fetch links:', error);
-    return new Response(JSON.stringify([]), { headers: { 'Content-Type': 'application/json' } });
+    return json([], 500);
   }
 };
 
 export const onRequestPost: PagesFunction = async (context) => {
   const { request, env } = context;
-  const prisma = getPrisma(env);
-  const { originalUrl, slug, domainId, title, utmSource, utmMedium, utmCampaign, isCloaked, password } = await request.json() as any;
+  const prisma = getPrisma(env as { DATABASE_URL: string });
+  const { originalUrl, slug, domainId, title, utmSource, utmMedium, utmCampaign, isCloaked, password } =
+    (await request.json()) as any;
 
-  // Parse Authorization header
-  const authHeader = request.headers.get('Authorization');
-  let userId = 'default-user';
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.split(' ')[1];
-      const payload = JSON.parse(atob(token));
-      userId = payload.id || 'default-user';
-    } catch (e) {
-      console.error('Failed to parse token', e);
-    }
+  const databaseUrl = (env as { DATABASE_URL?: string }).DATABASE_URL;
+  const jwtSecret = (env as { JWT_SECRET?: string }).JWT_SECRET;
+
+  if (!databaseUrl?.startsWith('prisma://')) {
+    return json({ error: 'DATABASE_URL must use Prisma Accelerate (prisma://...)' }, 503);
+  }
+
+  if (!jwtSecret) {
+    return json({ error: 'JWT_SECRET is missing.' }, 503);
+  }
+
+  const auth = await requireAuth(request, jwtSecret);
+  if (!auth) {
+    return json({ error: 'Unauthorized' }, 403);
   }
 
   try {
@@ -107,29 +118,24 @@ export const onRequestPost: PagesFunction = async (context) => {
         isCloaked,
         password,
         workspaceId: 'default-workspace',
-        creatorId: userId,
-      }
+        creatorId: auth.id,
+      },
     });
 
     await prisma.auditLog.create({
       data: {
-        userId: userId,
+        userId: auth.id,
         action: 'CREATE',
         entityType: 'LINK',
         entityId: link.id,
         details: { slug: link.slug, title: link.title },
-        workspaceId: 'default-workspace'
-      }
+        workspaceId: 'default-workspace',
+      },
     });
 
-    return new Response(JSON.stringify(link), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return json(link);
   } catch (error) {
     console.error('Failed to create link:', error);
-    return new Response(JSON.stringify({ error: 'Failed to create link' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return json({ error: 'Failed to create link' }, 500);
   }
 };

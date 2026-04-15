@@ -1,27 +1,32 @@
+import { requireAuth } from '../../lib/auth';
 import { getPrisma } from '../../lib/prisma';
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
 
 export const onRequestGet: PagesFunction = async (context) => {
   const { request, env } = context;
-  const prisma = getPrisma(env);
+  const databaseUrl = (env as { DATABASE_URL?: string }).DATABASE_URL;
+  const jwtSecret = (env as { JWT_SECRET?: string }).JWT_SECRET;
 
-  const authHeader = request.headers.get('Authorization');
-  let userRole = 'MEMBER';
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.split(' ')[1];
-      const payload = JSON.parse(atob(token));
-      userRole = payload.role;
-    } catch (e) {
-      console.error('Failed to parse token', e);
-    }
+  if (!databaseUrl?.startsWith('prisma://')) {
+    return json({ error: 'DATABASE_URL must use Prisma Accelerate (prisma://...)' }, 503);
   }
 
-  if (userRole !== 'ADMIN') {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403 });
+  if (!jwtSecret) {
+    return json({ error: 'JWT_SECRET is missing.' }, 503);
   }
 
-  const dbConnected = !!(env as any).DATABASE_URL && ((env as any).DATABASE_URL.startsWith('postgresql://') || (env as any).DATABASE_URL.startsWith('postgres://'));
-  if (!dbConnected) return new Response(JSON.stringify([]), { headers: { 'Content-Type': 'application/json' } });
+  const auth = await requireAuth(request, jwtSecret);
+  if (!auth || auth.role !== 'ADMIN') {
+    return json({ error: 'Unauthorized' }, 403);
+  }
+
+  const prisma = getPrisma(env as { DATABASE_URL: string });
 
   try {
     const users = await prisma.user.findMany({
@@ -33,15 +38,13 @@ export const onRequestGet: PagesFunction = async (context) => {
         status: true,
       },
       orderBy: {
-        email: 'asc'
-      }
+        email: 'asc',
+      },
     });
 
-    return new Response(JSON.stringify(users), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return json(users);
   } catch (error) {
     console.error('Failed to fetch users:', error);
-    return new Response(JSON.stringify([]), { headers: { 'Content-Type': 'application/json' } });
+    return json([], 500);
   }
 };

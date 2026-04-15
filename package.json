@@ -5,15 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "prisma generate && vite build",
+    "build": "npm run prisma:generate && vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "prisma:generate": "prisma generate",
+    "bootstrap:owner": "node scripts/bootstrap-owner.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
-    "@prisma/client": "^6.19.3",
+    "@prisma/client": "^6.4.1",
     "@prisma/extension-accelerate": "^2.0.0",
     "@tailwindcss/vite": "^4.1.14",
     "@types/d3": "^7.4.3",
@@ -30,7 +32,6 @@
     "ioredis": "^5.10.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
-    "prisma": "^6.4.1",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -38,7 +39,7 @@
     "tailwind-merge": "^3.5.0",
     "topojson-client": "^3.1.0",
     "ua-parser-js": "^2.0.9",
-    "vite": "^6.2.0"
+    "prisma": "^6.4.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260414.1",
