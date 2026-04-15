@@ -48,8 +48,15 @@ export const onRequestPost: PagesFunction = async (context) => {
       headers: { 'Content-Type': 'application/json' }
     });
 
-  } catch (error) {
-    console.error('Login error:', error);
-    return new Response(JSON.stringify({ error: 'Đã có lỗi xảy ra' }), { status: 500 });
+  } catch (error: any) {
+    console.error("RAW ERROR LOG:", error);
+    return new Response(JSON.stringify({ 
+      error: error.message || 'Unknown Error',
+      name: error.name || 'No Name',
+      stack: error.stack || 'No Stack',
+      full: String(error)
+    }), {
+      status: 500, headers: { 'Content-Type': 'application/json' }
+    });
   }
 };
