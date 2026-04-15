@@ -29,7 +29,8 @@ model User {
   password          String
   role              Role        @default(MEMBER)
   status            UserStatus  @default(PENDING)
-  verificationToken String?
+  emailVerified     DateTime?   // Bổ sung: Ngày xác thực email
+  verificationToken String?     // Token gửi qua email để xác nhận
   resetToken        String?
   resetTokenExpiry  DateTime?
   workspaces        Workspace[] @relation("WorkspaceMembers")
@@ -78,7 +79,7 @@ model Domain {
   // QR Code Settings
   qrForegroundColor String    @default("#000000")
   qrBackgroundColor String    @default("#ffffff")
-  qrFinderColor     String    @default("#000000")
+  qrFinderColor      String    @default("#000000")
   qrBorderRadius    Int       @default(0)
   qrFinderPattern   String    @default("square") // square, rounded, dot
   qrDotMode         String    @default("individual") // individual, connected
@@ -142,7 +143,7 @@ model TargetingRule {
 model ABTest {
   id          String   @id @default(cuid())
   linkId      String
-  link        Link     @relation(fields: [linkId], references: [id])
+  link      Link     @relation(fields: [linkId], references: [id])
   targetUrlB  String
   weightA     Int      @default(50)
   weightB     Int      @default(50)
@@ -184,7 +185,7 @@ model Conversion {
   linkId      String
   link        Link     @relation(fields: [linkId], references: [id])
   clickId     String?  @unique
-  click       Click?   @relation(fields: [clickId], references: [id])
+  click       Click?    @relation(fields: [clickId], references: [id])
   value       Float?   // Optional monetary value
   type        String?  // e.g., "signup", "purchase"
   timestamp   DateTime @default(now())
