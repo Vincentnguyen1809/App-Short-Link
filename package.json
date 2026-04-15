@@ -16,10 +16,7 @@
   "dependencies": {
     "@google/genai": "^1.29.0",
     "@prisma/client": "^6.4.1",
- codex/conduct-repository-audit-and-diagnosis-vmii4w
     "@prisma/extension-accelerate": "^3.0.1",
-    "@prisma/extension-accelerate": "^2.0.0",
- main
     "@tailwindcss/vite": "^4.1.14",
     "@types/d3": "^7.4.3",
     "@types/topojson-client": "^3.1.5",
@@ -41,11 +38,8 @@
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.5.0",
     "topojson-client": "^3.1.0",
- codex/conduct-repository-audit-and-diagnosis-vmii4w
     "ua-parser-js": "^2.0.9",
     "prisma": "^6.4.1"
-    "ua-parser-js": "^2.0.9"
- main
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260414.1",
