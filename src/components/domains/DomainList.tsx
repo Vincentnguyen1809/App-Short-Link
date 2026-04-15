@@ -69,7 +69,7 @@ export default function DomainList({ onAddClick, userRole }: { onAddClick?: () =
       });
       if (res.ok) fetchDomains();
       else {
-        const data = await res.json();
+        const data: any = await res.json();
         alert(data.error || 'Failed to delete domain');
       }
     } catch (error) {

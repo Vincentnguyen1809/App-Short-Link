@@ -26,10 +26,10 @@ export default function OrganizationSettings({ userRole }: OrganizationSettingsP
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        const data = await res.json();
+        const data: any[] = await res.json();
         setUsers(data);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch users', err);
     }
   };
@@ -70,10 +70,10 @@ export default function OrganizationSettings({ userRole }: OrganizationSettingsP
       if (res.ok) {
         fetchUsers();
       } else {
-        const err = await res.json();
+        const err: any = await res.json();
         alert(err.error || 'Failed to update user status');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating user status', err);
     }
   };
