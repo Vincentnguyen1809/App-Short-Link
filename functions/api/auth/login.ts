@@ -1,10 +1,16 @@
-import { getPrisma } from '../../lib/prisma';
+import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 export const onRequestPost: PagesFunction = async (context) => {
   const { request, env } = context;
   const { email, password } = await request.json() as any;
 
-  const prisma = getPrisma(env);
+  // FORCE THE PG ADAPTER
+  const pool = new Pool({ connectionString: (env as any).DATABASE_URL });
+  const adapter = new PrismaPg(pool);
+  const prisma = new PrismaClient({ adapter });
+
   const dbConnected = !!(env as any).DATABASE_URL && ((env as any).DATABASE_URL.startsWith('postgresql://') || (env as any).DATABASE_URL.startsWith('postgres://'));
 
   if (!dbConnected) {
