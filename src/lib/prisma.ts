@@ -1,15 +1,11 @@
-import { PrismaClient } from '@prisma/client';
-import { withAccelerate } from '@prisma/extension-accelerate';
+import { PrismaClient } from '@prisma/client/edge'
+import { withAccelerate } from '@prisma/extension-accelerate'
 
-const globalForPrisma = global as unknown as { prisma?: PrismaClient };
-
-export const prisma =
-  globalForPrisma.prisma ||
-  (new PrismaClient({
-    datasourceUrl: process.env.DATABASE_URL,
-    log: ['query'],
-  }).$extends(withAccelerate()) as PrismaClient);
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+/**
+ * Vincent lưu ý: 
+ * Trên Cloudflare Pages, chúng ta sử dụng @prisma/client/edge
+ * và không cần dùng biến global singleton như môi trường Node.js truyền thống.
+ */
+export const prisma = new PrismaClient({
+  log: ['query', 'error', 'warn'],
+}).$extends(withAccelerate())
