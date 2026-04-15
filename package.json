@@ -9,8 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "postinstall": "prisma generate",
-    "prisma:generate": "prisma generate",
+    "postinstall": "prisma generate --no-engine",
+    "prisma:generate": "prisma generate --no-engine",
     "bootstrap:owner": "node scripts/bootstrap-owner.mjs"
   },
   "dependencies": {
