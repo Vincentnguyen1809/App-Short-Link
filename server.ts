@@ -698,7 +698,7 @@ async function startServer() {
               id: userId,
               email: 'admin@example.com',
               name: 'Admin',
-              passwordHash: 'hashed_password'
+              password: 'hashed_password'
             }
           }
         }

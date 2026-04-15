@@ -2,8 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -27,10 +26,12 @@ model User {
   id                String      @id @default(cuid())
   email             String      @unique
   name              String?
-  passwordHash      String
+  password          String
   role              Role        @default(MEMBER)
   status            UserStatus  @default(PENDING)
   verificationToken String?
+  resetToken        String?
+  resetTokenExpiry  DateTime?
   workspaces        Workspace[] @relation("WorkspaceMembers")
   ownedWorkspaces   Workspace[] @relation("WorkspaceOwner")
   links             Link[]

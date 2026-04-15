@@ -1,14 +1,14 @@
 import { PrismaClient } from '@prisma/client';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { withAccelerate } from '@prisma/extension-accelerate';
 
-let prisma: PrismaClient;
+let prisma: PrismaClient | null = null;
 
-export function getPrisma(env: any) {
+export function getPrisma(env: { DATABASE_URL: string }) {
   if (!prisma) {
-    const pool = new Pool({ connectionString: env.DATABASE_URL });
-    const adapter = new PrismaPg(pool);
-    prisma = new PrismaClient({ adapter });
+    prisma = new PrismaClient({
+      datasourceUrl: env.DATABASE_URL,
+    }).$extends(withAccelerate()) as PrismaClient;
   }
+
   return prisma;
 }

@@ -1,68 +1,91 @@
-import { PrismaClient } from '@prisma/client';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { getPrisma } from '../../lib/prisma';
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function serializeError(error: unknown) {
+  const err = error as Error & { cause?: unknown };
+  return {
+    name: err?.name ?? 'UnknownError',
+    message: err?.message ?? String(error),
+    stack: err?.stack ?? null,
+    cause: err?.cause ?? null,
+    raw: String(error),
+  };
+}
+
+async function hashPassword(rawPassword: string) {
+  const encoder = new TextEncoder();
+  const buffer = await crypto.subtle.digest('SHA-256', encoder.encode(rawPassword));
+  return Array.from(new Uint8Array(buffer))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
 
 export const onRequestPost: PagesFunction = async (context) => {
-  const { request, env } = context;
-  const { email, password } = await request.json() as any;
-
-  // FORCE THE PG ADAPTER
-  const pool = new Pool({ connectionString: (env as any).DATABASE_URL });
-  const adapter = new PrismaPg(pool);
-  const prisma = new PrismaClient({ adapter });
-
-  const dbConnected = !!(env as any).DATABASE_URL && ((env as any).DATABASE_URL.startsWith('postgresql://') || (env as any).DATABASE_URL.startsWith('postgres://'));
-
-  if (!dbConnected) {
-    // Fallback to mock auth if DB is not connected
-    if (email === 'admin@thinksmartins.com' && password === 'admin123') {
-      return new Response(JSON.stringify({ 
-        token: btoa(JSON.stringify({ email, role: 'ADMIN' })), // Mock JWT
-        user: { email, name: 'Admin', role: 'ADMIN' } 
-      }), { headers: { 'Content-Type': 'application/json' } });
-    }
-    return new Response(JSON.stringify({ error: 'Database not connected' }), { status: 503 });
-  }
-
   try {
+    const { request, env } = context;
+    const body = (await request.json()) as { email?: string; password?: string };
+
+    const email = body.email?.trim().toLowerCase();
+    const password = body.password;
+
+    if (!email || !password) {
+      return json({ error: 'Email and password are required.' }, 400);
+    }
+
+    if (!(env as { DATABASE_URL?: string }).DATABASE_URL?.startsWith('prisma://')) {
+      return json(
+        {
+          error: 'DATABASE_URL must be a Prisma Accelerate connection string (prisma://...).',
+        },
+        503,
+      );
+    }
+
+    const prisma = getPrisma(env as { DATABASE_URL: string });
     const user = await prisma.user.findUnique({ where: { email } });
 
-    if (!user || user.passwordHash !== password) {
-      return new Response(JSON.stringify({ error: 'Email hoặc mật khẩu không chính xác' }), { status: 401 });
+    if (!user) {
+      return json({ error: 'Invalid email or password.' }, 401);
+    }
+
+    const hashedPassword = await hashPassword(password);
+    if (user.password !== hashedPassword) {
+      return json({ error: 'Invalid email or password.' }, 401);
     }
 
     if (user.status === 'PENDING') {
-      return new Response(JSON.stringify({ error: 'Tài khoản chưa được xác nhận. Vui lòng kiểm tra email.' }), { status: 403 });
+      return json({ error: 'Account is not verified yet.' }, 403);
     }
 
     if (user.status === 'SUSPENDED') {
-      return new Response(JSON.stringify({ error: 'Tài khoản đã bị khóa.' }), { status: 403 });
+      return json({ error: 'Account is suspended.' }, 403);
     }
 
-    // In a real app, sign a proper JWT. For this demo, we create a simple base64 encoded payload.
     const tokenPayload = {
       id: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
     };
+
     const token = btoa(JSON.stringify(tokenPayload));
 
-    return new Response(JSON.stringify({ 
-      token, 
-      user: { email: user.email, name: user.name, role: user.role } 
-    }), {
-      headers: { 'Content-Type': 'application/json' }
+    return json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        status: user.status,
+      },
     });
-
-  } catch (error: any) {
-    console.error("RAW ERROR LOG:", error);
-    return new Response(JSON.stringify({ 
-      error: error.message || 'Unknown Error',
-      name: error.name || 'No Name',
-      stack: error.stack || 'No Stack',
-      full: String(error)
-    }), {
-      status: 500, headers: { 'Content-Type': 'application/json' }
-    });
+  } catch (error) {
+    return json({ error: serializeError(error) }, 500);
   }
 };
