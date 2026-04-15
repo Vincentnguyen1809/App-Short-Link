@@ -2,3 +2,6 @@ name = "app-short-link"
 pages_build_output_dir = "dist"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+
+[vars]
+DATABASE_URL = "prisma+postgres://accelerate.prisma-data.net/?api_key=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqd3RfaWQiOjEsInNlY3VyZV9rZXkiOiJza19YemNNVmNqSWRiWDIyUkZ2WXN2czciLCJhcGlfa2V5IjoiMDFLUDgwUUNWNEVaRUJOVjREQjlNUUVOTTIiLCJ0ZW5hbnRfaWQiOiJlNjIxNjg2NjZlN2Q4NDg1MGI2YzY3ZGNiY2QzM2I1OTk5ZWE0MzQ1ODE0NWM4NzMyOTUwMGM0YjAyOTQ0NDA5IiwiaW50ZXJuYWxfc2VjcmV0IjoiOWM4Y2M5YjctNjUxMi00YWY4LWExMDktYjZmZDhlYzEzYWVlIn0.JYpydW7Io9rMmpxffrT8z3tBil59UMV84RX1au12M6c"
