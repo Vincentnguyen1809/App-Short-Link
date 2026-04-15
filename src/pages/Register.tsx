@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 
-const Register = () => {
+// Bổ sung "Cổng nhận lệnh" để chuyển về trang Login
+interface RegisterProps {
+  onSwitchToLogin: () => void;
+}
+
+const Register = ({ onSwitchToLogin }: RegisterProps) => {
   const [formData, setFormData] = useState({ email: '', password: '', name: '' });
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -14,8 +17,10 @@ const Register = () => {
     try {
       const res = await axios.post('/api/auth/register', formData);
       setMsg(res.data.message || 'Đăng ký thành công!');
-      // Tự động nhảy về trang Login sau 3 giây để người dùng đăng nhập
-      setTimeout(() => navigate('/login'), 3000);
+      
+      // Đợi 3 giây rồi dùng lệnh của App.tsx để nhảy về trang Login
+      setTimeout(() => onSwitchToLogin(), 3000);
+      
     } catch (err: any) {
       setMsg(err.response?.data?.error || 'Lỗi đăng ký, vui lòng thử lại');
     } finally {
@@ -24,8 +29,8 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
-      <form onSubmit={handleSubmit} className="bg-gray-800 p-8 rounded-xl shadow-lg w-96 border border-gray-700">
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-white">
+      <form onSubmit={handleSubmit} className="bg-[#1a1a1a] p-8 rounded-xl shadow-lg w-96 border border-[#262626]">
         <h2 className="text-2xl font-bold mb-6 text-orange-500 text-center">ThinkSmart Links</h2>
         <p className="text-gray-400 text-sm mb-6 text-center">Đăng ký tài khoản hệ thống</p>
         
@@ -38,17 +43,17 @@ const Register = () => {
         <div className="space-y-4">
           <input 
             type="text" placeholder="Họ và tên" required
-            className="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-orange-500 outline-none" 
+            className="w-full p-3 rounded bg-[#141414] border border-[#262626] focus:border-orange-500 outline-none" 
             onChange={e => setFormData({...formData, name: e.target.value})} 
           />
           <input 
             type="email" placeholder="Email" required
-            className="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-orange-500 outline-none" 
+            className="w-full p-3 rounded bg-[#141414] border border-[#262626] focus:border-orange-500 outline-none" 
             onChange={e => setFormData({...formData, email: e.target.value})} 
           />
           <input 
             type="password" placeholder="Mật khẩu" required
-            className="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-orange-500 outline-none" 
+            className="w-full p-3 rounded bg-[#141414] border border-[#262626] focus:border-orange-500 outline-none" 
             onChange={e => setFormData({...formData, password: e.target.value})} 
           />
         </div>
@@ -61,7 +66,7 @@ const Register = () => {
         </button>
         
         <p className="mt-4 text-center text-sm text-gray-500">
-          Đã có tài khoản? <span onClick={() => navigate('/login')} className="text-orange-400 cursor-pointer hover:underline">Đăng nhập</span>
+          Đã có tài khoản? <span onClick={onSwitchToLogin} className="text-orange-400 cursor-pointer hover:underline">Đăng nhập</span>
         </p>
       </form>
     </div>
