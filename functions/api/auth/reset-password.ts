@@ -1,4 +1,3 @@
-import { createAuthToken } from '../../lib/auth';
 import { getPrisma } from '../../lib/prisma';
 
 function json(data: unknown, status = 200) {
@@ -30,13 +29,13 @@ async function hashPassword(rawPassword: string) {
 export const onRequestPost: PagesFunction = async (context) => {
   try {
     const { request, env } = context;
-    const body = (await request.json()) as { email?: string; password?: string };
+    const body = (await request.json()) as { token?: string; password?: string };
 
-    const email = body.email?.trim().toLowerCase();
-    const password = body.password;
+    const token = body.token?.trim();
+    const password = body.password?.trim();
 
-    if (!email || !password) {
-      return json({ error: 'Email and password are required.' }, 400);
+    if (!token || !password) {
+      return json({ error: 'Token and new password are required.' }, 400);
     }
 
     if (!(env as { DATABASE_URL?: string }).DATABASE_URL?.startsWith('prisma://')) {
@@ -48,50 +47,32 @@ export const onRequestPost: PagesFunction = async (context) => {
       );
     }
 
-    const jwtSecret = (env as { JWT_SECRET?: string }).JWT_SECRET;
-    if (!jwtSecret) {
-      return json({ error: 'JWT_SECRET is missing.' }, 503);
-    }
-
     const prisma = getPrisma(env as { DATABASE_URL: string });
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: token,
+        resetTokenExpiry: {
+          gt: new Date(),
+        },
+      },
+    });
 
     if (!user) {
-      return json({ error: 'Invalid email or password.' }, 401);
+      return json({ error: 'Invalid or expired reset token.' }, 400);
     }
 
     const hashedPassword = await hashPassword(password);
-    if (user.password !== hashedPassword) {
-      return json({ error: 'Invalid email or password.' }, 401);
-    }
 
-    if (user.status === 'PENDING') {
-      return json({ error: 'Account is not verified yet.' }, 403);
-    }
-
-    if (user.status === 'SUSPENDED') {
-      return json({ error: 'Account is suspended.' }, 403);
-    }
-
-    const token = await createAuthToken(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      },
-      jwtSecret,
-    );
-
-    return json({
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        status: user.status,
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiry: null,
       },
     });
+
+    return json({ message: 'Password has been reset successfully.' });
   } catch (error) {
     return json({ error: serializeError(error) }, 500);
   }

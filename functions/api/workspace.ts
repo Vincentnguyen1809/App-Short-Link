@@ -1,57 +1,55 @@
+import { requireAuth } from '../lib/auth';
 import { getPrisma } from '../lib/prisma';
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
 
 export const onRequestGet: PagesFunction = async (context) => {
   const { env } = context;
-  const prisma = getPrisma(env);
+  const prisma = getPrisma(env as { DATABASE_URL: string });
 
   try {
     const workspace = await prisma.workspace.findFirst({
-      where: { id: 'default-workspace' }
+      where: { id: 'default-workspace' },
     });
-    return new Response(JSON.stringify(workspace), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: 'Failed to fetch workspace' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return json(workspace);
+  } catch {
+    return json({ error: 'Failed to fetch workspace' }, 500);
   }
 };
 
 export const onRequestPatch: PagesFunction = async (context) => {
   const { request, env } = context;
-  const prisma = getPrisma(env);
-  const body = await request.json() as any;
+  const databaseUrl = (env as { DATABASE_URL?: string }).DATABASE_URL;
+  const jwtSecret = (env as { JWT_SECRET?: string }).JWT_SECRET;
 
-  const authHeader = request.headers.get('Authorization');
-  let userRole = 'MEMBER';
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.split(' ')[1];
-      const payload = JSON.parse(atob(token));
-      userRole = payload.role;
-    } catch (e) {
-      console.error('Failed to parse token', e);
-    }
+  if (!databaseUrl?.startsWith('prisma://')) {
+    return json({ error: 'DATABASE_URL must use Prisma Accelerate (prisma://...)' }, 503);
   }
 
-  if (userRole !== 'ADMIN') {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403 });
+  if (!jwtSecret) {
+    return json({ error: 'JWT_SECRET is missing.' }, 503);
   }
+
+  const auth = await requireAuth(request, jwtSecret);
+  if (!auth || auth.role !== 'ADMIN') {
+    return json({ error: 'Unauthorized' }, 403);
+  }
+
+  const prisma = getPrisma(env as { DATABASE_URL: string });
+  const body = await request.json();
 
   try {
     const workspace = await prisma.workspace.update({
       where: { id: 'default-workspace' },
-      data: body
+      data: body as object,
     });
-    return new Response(JSON.stringify(workspace), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: 'Failed to update workspace' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return json(workspace);
+  } catch {
+    return json({ error: 'Failed to update workspace' }, 500);
   }
 };
