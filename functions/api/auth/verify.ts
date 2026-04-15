@@ -9,16 +9,15 @@ export const onRequestGet: PagesFunction = async (context) => {
     return Response.redirect(`${url.origin}/login?error=Thiếu token xác nhận`, 302);
   }
 
-  const prisma = getPrisma(env);
-  const dbConnected = !!(env as any).DATABASE_URL && ((env as any).DATABASE_URL.startsWith('postgresql://') || (env as any).DATABASE_URL.startsWith('postgres://'));
-
-  if (!dbConnected) {
+  if (!(env as { DATABASE_URL?: string }).DATABASE_URL?.startsWith('prisma://')) {
     return Response.redirect(`${url.origin}/login?error=Lỗi kết nối cơ sở dữ liệu`, 302);
   }
 
+  const prisma = getPrisma(env as { DATABASE_URL: string });
+
   try {
     const user = await prisma.user.findFirst({
-      where: { verificationToken: token }
+      where: { verificationToken: token },
     });
 
     if (!user) {
@@ -29,13 +28,20 @@ export const onRequestGet: PagesFunction = async (context) => {
       where: { id: user.id },
       data: {
         status: 'ACTIVE',
-        verificationToken: null
-      }
+        verificationToken: null,
+      },
     });
 
     return Response.redirect(`${url.origin}/login?success=Xác nhận email thành công. Bạn đã có thể đăng nhập!`, 302);
   } catch (error) {
-    console.error('Verification error:', error);
-    return Response.redirect(`${url.origin}/login?error=Đã có lỗi xảy ra. Vui lòng thử lại.`, 302);
+    const err = error as Error;
+    const details = encodeURIComponent(
+      JSON.stringify({
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+      }),
+    );
+    return Response.redirect(`${url.origin}/login?error=Đã có lỗi xảy ra&details=${details}`, 302);
   }
 };
